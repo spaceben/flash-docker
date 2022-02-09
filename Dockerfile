@@ -11,4 +11,4 @@ RUN tar xzf FLASH-1.2.11.tar.gz
 WORKDIR /usr/app/FLASH-1.2.11
 RUN make
 
-ENTRYPOINT [ "./flash" ]
+RUN ln -s /usr/app/FLASH-1.2.11/flash /usr/local/bin
