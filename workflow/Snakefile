@@ -1,0 +1,68 @@
+
+rule simulate_scheme:
+    conda: 
+        "envs/split.yaml"
+    input:
+        "data/{prefix}.fasta"
+    output:
+        "results/{prefix}.reference.fasta",
+        "results/{prefix}.primer.bed",
+        "results/{prefix}.insert.bed",
+        "results/{prefix}.primer.tsv",
+        "results/{prefix}.plot.pdf",
+        "results/{prefix}.plot.svg",
+        "results/{prefix}.report.json",
+        "results/{prefix}.pickle",
+        "results/{prefix}.log"
+    shell:
+        primalscheme multiplex --name {prefix} --outpath results {input} 
+
+rule split:
+    conda: 
+        "envs/split.yaml"
+    input:
+        "data/{sample}.cram"
+    output:
+        "results/{sample}.R1.fastq",
+        "results/{sample}.R2.fastq"        
+    shell:
+        "samtools collate -O {input} | samtools fastq -1 {output[0]} -2 {output[1]} -"
+
+rule flash:
+    container:
+        "docker://ghcr.io/spaceben/flash-docker:main"
+    input:
+        "results/{sample}.R1.fastq",
+        "results/{sample}.R2.fastq"
+    output:
+        "results/{sample}.extendedFrags.fastq",
+        "results/{sample}.notCombined_1.fastq",
+        "results/{sample}.notCombined_2.fastq",
+        "results/{sample}.hist",
+        "results/{sample}.histogram"
+    shell:
+        """
+        flash {input} -r 250 -f 400 -s 40 --allow-outies \
+            --output-prefix={wildcards.sample} --output-directory=results
+        """
+
+rule alignment:
+    conda: 
+        "envs/split.yaml"
+    input:
+        "data/NC_045512.2.fasta",
+        "results/{sample}.extendedFrags.fastq"
+    output:
+        "results/{sample}.sam"
+    shell:
+        "bwa index {input[0]} && bwa mem {input} > {output}"
+
+rule cleanup:
+    conda: 
+        "envs/split.yaml"
+    input:
+        "results/{sample}.sam"
+    output:
+        "results/{sample}.sorted.bam"
+    shell:
+        "samtools view -F 4 -F 2048 -b {input} | samtools sort - > {output}"
